@@ -17,12 +17,14 @@ import "./lib/WasabiStructs.sol";
  */
 contract WasabiPoolFactory is Ownable, IWasabiPoolFactory {
     WasabiOption private options;
+    // 準備 ETH Pool 和 ERC20 Pool 的模板合約
     ETHWasabiPool private immutable templatePool;
     ERC20WasabiPool private immutable templateERC20Pool;
 
     address public conduit;
     address public feeManager;
 
+    // 紀錄 Pool 的狀態 INVALID, ACTIVE, DISABLED
     mapping(address => PoolState) private poolState;
 
     /**
@@ -50,17 +52,20 @@ contract WasabiPoolFactory is Ownable, IWasabiPoolFactory {
         payable
         returns (address payable _poolAddress)
     {
+        // 使用 OpenZeppelin 的 clone fuction 來複製模板並部署新的 Pool
         ETHWasabiPool pool = ETHWasabiPool(payable(Clones.clone(address(templatePool))));
 
         _poolAddress = payable(address(pool));
         emit NewPool(_poolAddress, _nftAddress, _msgSender());
 
         IERC721 nft = IERC721(_nftAddress);
+        // 初始化剛部署的 Pool，依序傳入 factory address、nft address、option address、owner、admin
         pool.initialize{value: msg.value}(this, nft, address(options), _msgSender(), _admin);
 
+        // 將此 Pool 的狀態設為 ACTIVE
         poolState[_poolAddress] = PoolState.ACTIVE;
 
-        // Transfer initial NFTs from sender to pair
+        // 轉入初始的 NFT 到 Pool 裡
         uint256 numNFTs = _initialTokenIds.length;
         for (uint256 i; i < numNFTs;) {
             nft.safeTransferFrom(_msgSender(), _poolAddress, _initialTokenIds[i]);
